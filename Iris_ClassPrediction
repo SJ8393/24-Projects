@@ -1,0 +1,101 @@
+# Predict the class of the flower based on available attributes
+
+install.packages("caret",dependencies = T)
+library(lattice)
+library(caret)
+library(car)
+
+# Load iris dataset
+data(iris)
+irisData <- iris
+
+# Metadata of the dataset
+str(irisData)
+summary(irisData)
+
+# Check the freq distribution of classes
+table(irisData$Species)
+
+# Univariate Analysis
+boxplot(irisData[,-5])
+
+
+hist(irisData[,1],xlab=colnames(irisData)[1], main=paste("Frequency plot of ", colnames(irisData)[1]))
+hist(irisData[,2],xlab=colnames(irisData)[2], main=paste("Frequency plot of ", colnames(irisData)[2]))
+hist(irisData[,3],xlab=colnames(irisData)[3], main=paste("Frequency plot of ", colnames(irisData)[3]))
+hist(irisData[,4],xlab=colnames(irisData)[4], main=paste("Frequency plot of ", colnames(irisData)[4]))
+
+#Bivariate Analysis
+scatterplot(Sepal.Length~Sepal.Width|irisData[,5], data=irisData, main="Flower Species")
+scatterplotMatrix(~Sepal.Length+Sepal.Width+Petal.Length+Petal.Width|Species, data=irisData, main="Flower Species")
+
+cor(irisData[,-5])
+my_cols <- c("#00AFBB", "#E7B800", "#FC4E07")  
+library(psych)
+pairs.panels(irisData[,-5], 
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE, # show correlation ellipses
+             bg = my_cols[irisData$Species]
+)
+
+# Splitting into test and train
+
+index = sort(sample(nrow(irisData), nrow(irisData)*.7))
+train<-irisData[index,]
+test<-irisData[-index,]
+
+# Cross validation metrics - Test harness
+control <- trainControl(method="cv", number=5)
+metric <- 'Accuracy'
+
+# LDA
+set.seed(7)
+fit.lda <- train(Species~., data=train, method='lda', metric = metric, trControl = control)
+
+#CART
+set.seed(7)
+fit.cart <- train(Species~., data=train, method='rpart', metric = metric, trControl = control)
+
+#KNN
+set.seed(7)
+fit.knn <- train(Species~., data=train, method='knn', metric = metric, trControl = control)
+
+#SVM
+set.seed(7)
+fit.svm <- train(Species~., data=train, method='svmRadial', metric = metric, trControl = control)
+
+
+#RF
+set.seed(7)
+fit.rf <- train(Species~., data=train, method='rf', metric = metric, trControl = control)
+
+#XGBTree
+set.seed(7)
+fit.xgb <- train(Species~., data=train, method='xgbTree', metric = metric, trControl = control)
+
+#NNET
+set.seed(7)
+fit.nnet <- train(Species~., data=train, method='nnet', metric = metric, trControl = control)
+
+lda.predict <- predict(fit.lda, test[,-5])
+confusionMatrix(lda.predict, test$Species)
+
+cart.predict <- predict(fit.cart, test[,-5])
+confusionMatrix(cart.predict, test$Species)
+
+knn.predict <- predict(fit.knn, test[,-5])
+confusionMatrix(knn.predict, test$Species)
+
+svm.predict <- predict(fit.svm, test[,-5])
+confusionMatrix(svm.predict, test$Species)
+
+rf.predict <- predict(fit.rf, test[,-5])
+confusionMatrix(rf.predict, test$Species)
+
+xgb.predict <- predict(fit.xgb, test[,-5])
+confusionMatrix(xgb.predict, test$Species)
+
+nnet.predict <- predict(fit.nnet, test[,-5])
+confusionMatrix(nnet.predict, test$Species)
