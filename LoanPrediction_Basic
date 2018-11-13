@@ -1,0 +1,136 @@
+# Predict loan approval based on available attributes
+
+install.packages("caret",dependencies = T)
+install.packages("hmisc",dependencies = T)
+library(lattice)
+library(caret)
+library(car)
+library(gmodels) # For Cross Table
+library(randomForest)
+library(Hmisc)  # For impute function
+library(dplyr) 
+
+
+getwd()
+setwd("C:/Users/Surbhi.Jamwal/Desktop/Modeling/Loan Prediction")
+
+# Load Loan dataset
+data(loan)
+loanData <- read.csv("train_loan.csv", na.strings = c("","N/A"))
+loanData_test <- read.csv("test_loan.csv", na.strings = c("","N/A"))
+
+loanData$Credit_History <- as.factor(loanData$Credit_History)
+loanData_test$Credit_History <- as.factor(loanData_test$Credit_History)
+
+unique(loanData$Education)
+unique(loanData$Dependents)
+unique(loanData$Credit_History)
+
+# Metadata of the dataset
+str(loanData)
+summary(loanData)
+summary(loanData_test)
+
+#Removing rows with null cases
+loanData2 <- loanData[which(complete.cases(loanData)),]
+
+#Variable Importance
+set.seed(4543)
+train.rf <- randomForest(Loan_Status ~ ., data=loanData2[,-1], ntree=250, keep.forest=FALSE,
+                         importance=TRUE)
+
+randomForest::importance(train.rf, type=2)
+
+#Impute variable with null values as median for numeric, mode for non-numeric variables
+numeric_cols <- colnames(select_if(loanData, is.numeric))
+non_numeric_cols <- colnames(select_if(loanData, is.factor))
+
+
+for (i in numeric_cols)
+{
+  loanData[,i] <- impute(loanData[,i],median)
+}
+
+for (i in non_numeric_cols)
+{
+  loanData[,i] <- impute(loanData[,i],mode)
+}
+
+colSums(is.na(loanData))
+
+# Check the freq distribution of classes
+table(loanData$Loan_Status)
+
+# Univariate Analysis
+boxplot(loanData[,-1])
+
+hist(loanData[,7],xlab=colnames(loanData)[7], main=paste("Frequency plot of ", colnames(loanData)[7]))
+hist(loanData[,8],xlab=colnames(loanData)[8], main=paste("Frequency plot of ", colnames(loanData)[8]))
+hist(loanData[,9],xlab=colnames(loanData)[9], main=paste("Frequency plot of ", colnames(loanData)[9]))
+hist(loanData[,10],xlab=colnames(loanData)[10], main=paste("Frequency plot of ", colnames(loanData)[10]))
+
+# Splitting into test and train
+
+index = sort(sample(nrow(loanData), nrow(loanData)*.7))
+train<-loanData[index,]
+test<-loanData[-index,]
+
+# Cross validation metrics - Test harness
+control <- trainControl(method="cv", number=5)
+metric <- 'Accuracy'
+
+# LDA
+set.seed(7)
+fit.lda <- train(Loan_Status~., data=train[,-1], method='lda', metric = metric, trControl = control)
+
+#CART
+set.seed(7)
+fit.cart <- train(Loan_Status~., data=train[,-1], method='rpart', metric = metric, trControl = control)
+
+#KNN
+set.seed(7)
+fit.knn <- train(Loan_Status~., data=train[,-1], method='knn', metric = metric, trControl = control)
+
+#SVM
+set.seed(7)
+fit.svm <- train(Loan_Status~., data=train[,-1], method='svmRadial', metric = metric, trControl = control)
+
+#RF
+set.seed(7)
+fit.rf <- train(Loan_Status~., data=train[-1], method='rf', metric = metric, trControl = control)
+
+#XGBTree
+set.seed(7)
+fit.xgb <- train(Loan_Status~., data=train[,-1], method='xgbTree', metric = metric, trControl = control)
+
+#NNET
+set.seed(7)
+fit.nnet <- train(Loan_Status~., data=train[,-1], method='nnet', metric = metric, trControl = control)
+
+lda.predict <- predict(fit.lda, test[,2:12])
+confusionMatrix(lda.predict, test[,13])
+
+cart.predict <- predict(fit.cart, test[,2:12])
+confusionMatrix(cart.predict, test[,13])
+
+knn.predict <- predict(fit.knn, test[,2:12])
+confusionMatrix(knn.predict, test[,13])
+
+svm.predict <- predict(fit.svm, test[,2:12])
+confusionMatrix(svm.predict, test[,13])
+
+rf.predict <- predict(fit.rf, test[,2:12])
+confusionMatrix(rf.predict, test[,13])
+
+xgb.predict <- predict(fit.xgb, test[,2:12])
+confusionMatrix(xgb.predict, test[,13])
+
+nnet.predict <- predict(fit.nnet, test[,2:12])
+confusionMatrix(nnet.predict, test[,13])
+
+
+CrossTable(cart.predict, test[,13],
+           prop.chisq = FALSE, prop.t = FALSE,
+           dnn = c('predicted', 'actual'))
+
+
